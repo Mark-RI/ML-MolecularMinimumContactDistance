@@ -1,6 +1,8 @@
 # ML-MolecularMinimumContactDistance
 Machine Learning Algorithm. Find the minimum distance between two disks in three spatial dimensions. Ultimate aim is to find the kihara energy between two molecules.
 
+![Description of the image](https://github.com/Mark-RI/ML-MolecularMinimumContactDistance/raw/main/assets/MinimumDistanceCircles3D.png)
+
 Definition of the parametric equation for a circle. 
 $Point (\theta, r)=center+(rsin(\theta)v+rcos(\theta)u)$  $r \in (0, r]$ 
 
