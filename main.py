@@ -233,13 +233,13 @@ def energy(coordinate_matrix, box, coordinate_matrix_e, coordinate_matrix_em, n)
     minimum_image_matrix=separation_matrix-1*torch.round(separation_matrix/1)
     scaled_matrix = minimum_image_matrix*box
     distance_matrix = (torch.sum(scaled_matrix**2, dim=0, keepdim=True))**0.5
-    minimum_contact_distance_matrix = 
+#    minimum_contact_distance_matrix = 
     energy_matrix = ((1/distance_matrix)**12-(1/distance_matrix)**6)*4
     loss = torch.sum(energy_matrix)
     total_distance = torch.sum(distance_matrix)
     return loss, total_distance, distance_matrix, minimum_image_matrix, separation_matrix, energy_matrix, scaled_matrix, box
 
-def add_disk(normal, point, radius, color):
+def add_disk(normal, point, radius, color, ax):
     theta = np.linspace(0, 2*np.pi, 50)
     x = radius * np.cos(theta)
     y = radius * np.sin(theta)
