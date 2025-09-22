@@ -225,7 +225,146 @@ def plotparticles(rx, ry, rz, rxc, ryc, rzc, title, boxgas=1,):
     ax.grid()
     ax.set_title(title)
 
-def energy(coordinate_matrix, box, coordinate_matrix_e, coordinate_matrix_em, n):
+def minimum_contact_distance(s, zn, zm):
+    d=xl
+    zr=d/2
+    xx=s.clone()
+    wn=torch.sum(zn*zm, dim=0)
+    auxi=abs(wn)
+
+    w = torch.cross(zn, zm, dim=0)
+    w=w/torch.norm(w, dim=0, keepdim=True)
+    z = torch.cross(zn, w, dim=0)
+    z=z/torch.norm(z, dim=0, keepdim=True)
+    y = torch.cross(w, zm, dim=0)
+    y=y/torch.norm(y, dim=0, keepdim=True)
+    a=torch.sum(z*y, dim=0)*-1
+    b=torch.sum(s*z, dim=0)
+    c=torch.sum(s*y, dim=0)
+    tt=(a*b+c)/(a*a-1)
+    t=(a*c+b)/(1-a*a)
+    z=torch.where(t<0, z*-1, z)
+    t=torch.where(t<0, t*-1, t)
+    y=torch.where(t<0, y*-1, y)
+    tt=torch.where(tt<0, tt*-1, tt)
+    p=s+tt*y-t*z
+    pq=torch.sum(p*p, dim=0)
+    v=zr*zr-t*t
+    vv=zr*zr-tt*tt
+    aaa=torch.sum(s*zm, dim=0)
+    bbb=torch.sum(s*zn, dim=0)
+    aa=-zr*torch.sum(z*zm, dim=0)+aaa
+    bb=zr*torch.sum(y*zn, dim=0)+bbb
+    cc=torch.sum(s*s, dim=0)
+    v1q=cc+zr*zr-aa*aa-2*zr*torch.sum(s*z, dim=0)
+    v2q=cc+zr*zr-bb*bb+2*zr*torch.sum(s*y, dim=0)
+
+    a=zr
+    b=zr
+    o=pq**0.5
+    u=torch.sum(z*y, dim=0)
+
+    def iterator():
+        a=zr
+        b=zr
+        for _ in range(10):
+            c=(tt-(t-a)*u)/(o-(zr*zr-a*a)**0.5)
+            d=(c*c*zr*zr/(1+c*c))**0.5
+            c=(t-(tt-d)*u)/(o-(zr*zr-d*d)**0.5)
+            e=(c*c*zr*zr/(1+c*c))**0.5
+            a=e
+            b=d
+        sa=(zr*zr-a*a)**0.5
+        sb=(zr*zr-b*b)**0.5
+        ss=pq+2*zr*zr-a*a-b*b+(t-a)*(t-a)+(tt-b)*(tt-b)-2*(t-a)*(tt-b)*u-2*o*(sa+sb)+2*sa*sb
+        return ss
+    
+    def iterator2():
+        a=zr
+        b=zr
+        sa=(zr*zr-a*a)**0.5
+        sb=(zr*zr-b*b)**0.5
+        ss=pq+2*zr*zr-a*a-b*b+(t-a)*(t-a)+(tt-b)*(tt-b)-2*(t-a)*(tt-b)*u-2*o*(sa+sb)+2*sa*sb
+        return ss
+    
+    def iterator3():
+        a=zr
+        b=zr
+        for _ in range(10):
+            c=(tt-(t+a)*u)/(o-(zr*zr-a*a)**0.5)
+            d=(c*c*zr*zr/(1+c*c))**0.5
+            c=-(t-(tt-d)*u)/(o-(zr*zr-d*d)**0.5)
+            e=(c*c*zr*zr/(1+c*c))**0.5
+            a=e
+            b=d
+        sa=(zr*zr-a*a)**0.5
+        sb=(zr*zr-b*b)**0.5
+        rr=(t+a)*(t+a)+(tt-b)*(tt-b)-2*(t+a)*(tt-b)*u+(o-sa-sb)*(o-sa-sb)
+        return rr
+    
+    def iterator4():
+        a=zr
+        b=zr
+        sa=(zr*zr-a*a)**0.5
+        sb=(zr*zr-b*b)**0.5
+        rr=(t+a)*(t+a)+(tt-b)*(tt-b)-2*(t+a)*(tt-b)*u+(o-sa-sb)*(o-sa-sb)
+        return rr
+    
+    def iterator5():
+        a=zr
+        b=zr
+        for _ in range(10):
+            c=-(tt-(t-a)*u)/(o-(zr*zr-a*a)**0.5)
+            d=(c*c*zr*zr/(1+c*c))**0.5
+            c=(t-(tt+d)*u)/(o-(zr*zr-d*d)**0.5)
+            e=(c*c*zr*zr/(1+c*c))**0.5
+            a=e
+            b=d
+        sa=(zr*zr-a*a)**0.5
+        sb=(zr*zr-b*b)**0.5
+        rr=(t-a)*(t-a)+(tt+b)*(tt+b)-2*(t-a)*(tt+b)*u+(o-sa-sb)*(o-sa-sb)
+        return rr
+    
+    def iterator6():
+        a=zr
+        b=zr
+        sa=(zr*zr-a*a)**0.5
+        sb=(zr*zr-b*b)**0.5
+        rr=(t-a)*(t-a)+(tt+b)*(tt+b)-2*(t-a)*(tt+b)*u+(o-sa-sb)*(o-sa-sb)
+        return rr
+    
+    ss_o=torch.where(o!=0, iterator(), iterator2())
+
+    ss_tt=torch.where((tt>t), torch.where((o!=0), iterator3(), iterator4()), torch.tensor(1e10))
+
+    ss_t=torch.where((t>=tt), torch.where((o!=0), iterator5(), iterator6()), torch.tensor(1e10))
+
+    stacked = torch.stack([ss_o, ss_tt, ss_t], dim=0)
+    min_tensor = torch.min(stacked, dim=0).values
+
+    min_t=((min_tensor)**0.5).clone()
+
+    min_no_nan = torch.nan_to_num(min_t, nan=1e10)
+
+    ss_3=(min_tensor)**0.5
+
+    ss3=torch.where((tt>zr) & (v2q<zr**2), abs(bb), ss_3)
+    ss2=torch.where((t>zr) & (v1q<zr**2), abs(aa), ss3)
+    ss_2=torch.where((v>0) & (vv>0) & (v+vv+2*(v*vv)**0.5>pq), 0, ss2)
+
+    rv=torch.where(auxi>0.9999999, torch.sum(s*zn, dim=0), ss_2)
+    xc=(zn*rv)
+    sc=(xx-xc)
+    sc=sc/torch.norm(sc, dim=0, keepdim=True)
+    auxi = (torch.sum((xc-xx)*(xc-xx), dim=0))**0.5
+    ss1=torch.where(auxi<d, rv, (torch.sum(((xx-(zr*sc))-((xc+(zr*sc))-rv*zn))*((xx-zr*sc)-((xc+zr*sc)-rv*zn)), dim=0))**0.5)
+    ss_1=torch.where(rv==0, ((torch.sum(s*s, dim=0))**0.5)-d, ss1)
+
+    stacked_final = torch.stack([min_no_nan, ss_1], dim=0)
+    min_contact_distance_tensor = torch.min(stacked_final, dim=0).values
+    return(abs(min_contact_distance_tensor))
+
+def energy(coordinate_matrix, orientation_matrix, box, n):
     i, j = torch.triu_indices(n, n, offset=1)
     coord_i = coordinate_matrix[:, i]
     coord_j = coordinate_matrix[:, j]
@@ -233,6 +372,8 @@ def energy(coordinate_matrix, box, coordinate_matrix_e, coordinate_matrix_em, n)
     minimum_image_matrix=separation_matrix-1*torch.round(separation_matrix/1)
     scaled_matrix = minimum_image_matrix*box
     distance_matrix = (torch.sum(scaled_matrix**2, dim=0, keepdim=True))**0.5
+    zn = orientation_matrix[:, i]
+    zm = orientation_matrix[:, j]
 #    minimum_contact_distance_matrix = 
     energy_matrix = ((1/distance_matrix)**12-(1/distance_matrix)**6)*4
     loss = torch.sum(energy_matrix)
