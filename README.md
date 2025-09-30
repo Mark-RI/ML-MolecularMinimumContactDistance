@@ -11,3 +11,14 @@ v and u are vectors that are orthoganol to each other and the normal (orientatio
 You can use torch.clamp to constrain r.
 
 By implementing a machine learning method you can find the minimum distance between the circles. I found that starting with r = r max works really well to avoid minimums. The inital value of $\theta$ can be random.
+
+# Energy Minimizer Machine Learning Algorithm  
+
+Find the optimal configuration of benezene molecules in liquid and gas.
+
+Optimal Gas configuration.
+![Description of the image](https://github.com/Mark-RI/ML-MolecularMinimumContactDistance/raw/main/assets/GasMinimumEnergyTransformation.png)
+
+
+Optimal Liquid configuration.
+![Description of the image](https://github.com/Mark-RI/ML-MolecularMinimumContactDistance/raw/main/assets/LiquidMinimumEnergyTransformation.png)
