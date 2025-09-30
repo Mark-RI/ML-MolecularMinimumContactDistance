@@ -38,7 +38,7 @@ def vp(a,b):
 
 def initia():
     global rmaxgas, rmaxliq, vol
-    ngas, nliq, n, rxgas, rygas, rzgas, rxliq, ryliq, rzliq, ex, ey, ez, emx, emy, emz = fcc()
+    ngas, nliq, n, rxgas, rygas, rzgas, rxliq, ryliq, rzliq, exgas, eygas, ezgas, exliq, eyliq, ezliq, emxgas, emygas, emzgas, emxliq, emyliq, emzliq = fcc()
     volgas=ngas/densigas
     volliq=nliq/densiliq
     vol=volgas+volliq
@@ -54,7 +54,7 @@ def initia():
     cutliq2=cutliq**2
     rmaxgas=rmaxgas/boxgas
     rmaxliq=rmaxliq/boxliq
-    return ngas, nliq, n, rxgas, rygas, rzgas, rxliq, ryliq, rzliq, ex, ey, ez, emx, emy, emz, boxliq, boxgas, cutgas2, cutliq2, vol
+    return ngas, nliq, n, rxgas, rygas, rzgas, rxliq, ryliq, rzliq, exgas, eygas, ezgas, exliq, eyliq, ezliq, emxgas, emygas, emzgas, emxliq, emyliq, emzliq, boxliq, boxgas, cutgas2, cutliq2, vol
 
 def fcc():
     rroot3=1/np.sqrt(3)
@@ -191,22 +191,38 @@ def fcc():
     rxliq = rx.copy()
     ryliq = ry.copy()
     rzliq = rz.copy()
+    exgas = ex.copy()
+    eygas = ey.copy()
+    ezgas = ez.copy()
+    exliq = ex.copy()
+    eyliq = ey.copy()
+    ezliq = ez.copy()
+    emxgas = emx.copy()
+    emygas = emy.copy()
+    emzgas = emz.copy()
+    emxliq = emx.copy()
+    emyliq = emy.copy()
+    emzliq = emz.copy()
 
-    return ngas, nliq, n, rxgas, rygas, rzgas, rxliq, ryliq, rzliq, ex, ey, ez, emx, emy, emz
+    return ngas, nliq, n, rxgas, rygas, rzgas, rxliq, ryliq, rzliq, exgas, eygas, ezgas, exliq, eyliq, ezliq, emxgas, emygas, emzgas, emxliq, emyliq, emzliq
 
-def plotparticles(rx, ry, rz, rxc, ryc, rzc, title, boxgas=1,):
+def plotparticles(rx, ry, rz, exo, eyo, ezo, rxc, ryc, rzc, ex, ey, ez, title, boxgas=1):
     figgas = plt.figure()
     ax = figgas.add_subplot(111, projection='3d')
 
     vectors = {}
     for i in range(len(rx)):
-        vectors.update({i: {'point':[rx[i], ry[i], rz[i]], 'color': 'g'}})
+        vectors.update({i: {'vector': [exo[i], eyo[i], ezo[i]], 'point':[rx[i], ry[i], rz[i]], 'color': 'g'}})
 
     for i in range(len(rxc)):        
-        vectors.update({i+.5: {'point':[rxc[i], ryc[i], rzc[i]], 'color': 'r'}})
+        vectors.update({i+.5: {'vector': [ex[i], ey[i], ez[i]], 'point':[rxc[i], ryc[i], rzc[i]], 'color': 'r'}})
 
     for label, props in vectors.items():
         ax.scatter(*props['point'], color=props['color'], alpha=1)
+        ax.quiver(*props['point'], *props['vector'], 
+                color=props['color'], 
+                arrow_length_ratio=0.1,
+                linewidth=2)
 
     ax.set_xlim([-.5*boxgas, .5*boxgas])
     ax.set_ylim([-.5*boxgas, .5*boxgas])
@@ -354,23 +370,35 @@ def minimum_contact_distance(s, zn, zm):
 
     stacked_final = torch.stack([min_no_nan, ss_1], dim=0)
     min_contact_distance_tensor = torch.min(stacked_final, dim=0).values
-    return(abs(min_contact_distance_tensor))
+    return(torch.sqrt(min_contact_distance_tensor**2))
 
 def energy(coordinate_matrix, orientation_matrix, box, n):
+    orientation_matrix = orientation_matrix / torch.sqrt(torch.sum(orientation_matrix**2, dim=0))
     i, j = torch.triu_indices(n, n, offset=1)
     coord_i = coordinate_matrix[:, i]
     coord_j = coordinate_matrix[:, j]
     separation_matrix = coord_i - coord_j
     minimum_image_matrix=separation_matrix-1*torch.round(separation_matrix/1)
     scaled_matrix = minimum_image_matrix*box
-    distance_matrix = (torch.sum(scaled_matrix**2, dim=0, keepdim=True))**0.5
+    distance_matrix = (torch.sum(scaled_matrix**2, dim=0))**0.5
     zn = orientation_matrix[:, i]
     zm = orientation_matrix[:, j]
-#    minimum_contact_distance_matrix = 
-    energy_matrix = ((1/distance_matrix)**12-(1/distance_matrix)**6)*4
+    r12eu1 = torch.sum(zn*scaled_matrix, dim=0)
+    r12eu2 = torch.sum(zm*scaled_matrix, dim=0)
+    u1eu2 = torch.sum(zn*zm, dim=0)
+    c1=r12eu1/distance_matrix
+    c2=r12eu2/distance_matrix
+    temp1=1-5*c1*c1-5*c2*c2-15*c1*c1*c2*c2
+    temp2=2*(u1eu2-5*c1*c2)**2
+    quadrupole_energy_matrix=3/4*qq2*(temp1+temp2)/(distance_matrix*5)
+    #minimum_contact_distance_matrix = minimum_contact_distance(scaled_matrix, zn, zm)
+    #energy_matrix = ((1/minimum_contact_distance_matrix)**12-(1/minimum_contact_distance_matrix)**6)*4
+    #print(minimum_contact_distance_matrix)
+    vdw_energy_matrix = ((1/distance_matrix)**12-(1/distance_matrix)**6)*4
+    energy_matrix = quadrupole_energy_matrix+vdw_energy_matrix
     loss = torch.sum(energy_matrix)
     total_distance = torch.sum(distance_matrix)
-    return loss, total_distance, distance_matrix, minimum_image_matrix, separation_matrix, energy_matrix, scaled_matrix, box
+    return loss #, total_distance, distance_matrix, minimum_image_matrix, separation_matrix, energy_matrix, scaled_matrix, box
 
 def add_disk(normal, point, radius, color, ax):
     theta = np.linspace(0, 2*np.pi, 50)
